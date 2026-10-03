@@ -1,0 +1,25 @@
+{
+  "expo": {
+    "name": "Lantern",
+    "slug": "lantern-chat",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#25D366",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "package": "app.lantern.chat"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    }
+  }
+}
