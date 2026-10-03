@@ -49,3 +49,11 @@ jobs:
           name: lantern-${{ matrix.app }}-preview-apk
           path: ${{ matrix.app }}/android/app/build/outputs/apk/release/*.apk
           retention-days: 7
+      - name: Publish APK to release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG=preview-${{ github.run_number }}
+          gh release create "$TAG" --repo "${{ github.repository }}" --title "Lantern preview $TAG" --notes "Debug-signed preview APKs. Not a store release." || true
+          cp ${{ matrix.app }}/android/app/build/outputs/apk/release/app-release.apk lantern-${{ matrix.app }}-$TAG.apk
+          gh release upload "$TAG" lantern-${{ matrix.app }}-$TAG.apk --repo "${{ github.repository }}" --clobber
