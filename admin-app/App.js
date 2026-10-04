@@ -14,7 +14,7 @@ export default function App() {
     <View style={[s.c, { justifyContent: 'center', padding: 28 }]}>
       <Text style={s.h}>Lantern Admin</Text>
       {ok === 'denied' && <Text style={{ color: '#c00', marginBottom: 10 }}>This account is not an admin.</Text>}
-      <TextInput style={s.f} placeholder="Username" autoCapitalize="none" value={u} onChangeText={setU} />
+      <TextInput style={s.f} placeholder="Email" autoCapitalize="none" value={u} onChangeText={setU} />
       <TextInput style={s.f} placeholder="Password" secureTextEntry value={p} onChangeText={setP} />
       {!!err && <Text style={{ color: '#c00' }}>{err}</Text>}
       <Pressable style={s.b} onPress={async () => { try { await A.signIn(u, p); await check(); } catch (e) { setErr(e.message); } }}><Text style={{ color: '#fff', fontWeight: '700' }}>Sign in</Text></Pressable>

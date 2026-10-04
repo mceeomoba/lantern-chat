@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
-import { SUPABASE_URL, SUPABASE_KEY, EMAIL_DOMAIN } from './config';
+import { SUPABASE_URL, SUPABASE_KEY} from './config';
 export const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
-export const signIn = async (u, p) => { const { error } = await sb.auth.signInWithPassword({ email: `${u.trim().toLowerCase()}@${EMAIL_DOMAIN}`, password: p }); if (error) throw error; };
+export const signIn = async (u, p) => { const { error } = await sb.auth.signInWithPassword({ email: u.trim().toLowerCase(), password: p }); if (error) throw error; };
 export const isAdmin = async () => { const { data } = await sb.rpc('is_admin'); return data === true; };
 export const getReports = async () => (await sb.from('reports').select('*').order('created_at', { ascending: false }).limit(100)).data || [];
 export const setReport = (id, status) => sb.from('reports').update({ status }).eq('id', id);
