@@ -1,14 +1,23 @@
 import { createClient } from '@supabase/supabase-js';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { AppState } from 'react-native';
 import { SUPABASE_URL, SUPABASE_KEY } from './config';
-export const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
+export const sb = createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { storage: AsyncStorage, autoRefreshToken: true, persistSession: true, detectSessionInUrl: false } });
+AppState.addEventListener('change', (st) => { if (st === 'active') sb.auth.startAutoRefresh(); else sb.auth.stopAutoRefresh(); });
+sb.auth.startAutoRefresh();
+async function resolveEmail(ident, p) {
+  const id = ident.trim();
+  const { data } = await sb.rpc('login_email', { ident: id, pass: p });
+  return data || id.toLowerCase();
+}
 export async function signUp(email, u, p) {
   const { error } = await sb.auth.signUp({ email: email.trim().toLowerCase(), password: p, options: { data: { username: u.trim().toLowerCase() } } });
   if (error) throw error;
   const r = await sb.auth.signInWithPassword({ email: email.trim().toLowerCase(), password: p });
   if (r.error) throw r.error;
 }
-export async function signIn(email, p) {
-  const { error } = await sb.auth.signInWithPassword({ email: email.trim().toLowerCase(), password: p });
+export async function signIn(ident, p) {
+  const { error } = await sb.auth.signInWithPassword({ email: await resolveEmail(ident, p), password: p });
   if (error) throw error;
 }
 export async function listChats(me) {

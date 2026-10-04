@@ -71,9 +71,9 @@ function Auth() {
         <Text style={{ fontSize: 30, fontWeight: '700', marginTop: 14 }}>Lantern</Text>
         <Text style={{ color: '#666', marginTop: 4 }}>Simple, fast messaging</Text>
       </View>
-      <TextInput style={s.field} placeholder="Email" autoCapitalize="none" keyboardType="email-address" value={em} onChangeText={setEm} />
+      <TextInput style={s.field} placeholder={up ? "Email" : "Email or username"} autoCapitalize="none" autoCorrect={false} keyboardType="email-address" value={em} onChangeText={setEm} />
       {up && <TextInput style={s.field} placeholder="Username (a-z, 0-9, _)" autoCapitalize="none" value={u} onChangeText={setU} />}
-      <TextInput style={s.field} placeholder="Password" secureTextEntry value={p} onChangeText={setP} />
+      <TextInput style={s.field} placeholder="Password" autoCapitalize="none" autoCorrect={false} secureTextEntry value={p} onChangeText={setP} />
       {!!err && <Text style={{ color: '#c00', marginBottom: 8 }}>{err}</Text>}
       <Pressable style={s.btn} disabled={busy} onPress={() => (up ? setUp(false) : go(false))}><Text style={s.btnT}>Log in</Text></Pressable>
       <Pressable style={[s.btn, { backgroundColor: '#fff', borderWidth: 1, borderColor: G }]} disabled={busy} onPress={() => (up ? go(true) : setUp(true))}><Text style={[s.btnT, { color: GD }]}>Create account</Text></Pressable>

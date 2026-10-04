@@ -23,7 +23,8 @@
     "react-native": "0.86.3",
     "react-native-safe-area-context": "~5.7.0",
     "react-native-web": "^0.21.2",
-    "react-native-webrtc": "^124.0.8"
+    "react-native-webrtc": "^124.0.8",
+    "@react-native-async-storage/async-storage": "2.2.0"
   },
   "scripts": {
     "start": "expo start",
