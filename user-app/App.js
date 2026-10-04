@@ -5,7 +5,7 @@ import * as DocumentPicker from 'expo-document-picker';
 import * as Location from 'expo-location';
 import { AudioModule, RecordingPresets, createAudioPlayer, setAudioModeAsync, useAudioRecorder } from 'expo-audio';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { sb, signIn, signUp, listChats, listMessages, sendMessage, openDm, reportMessage, peerReadAt, markRead, listGames, startGame, gameMove, startCall, setCall, listCalls, listStatuses, postStatus, uploadMedia, sendMedia, sendKind, signedUrl, postStatusPhoto, contacts } from './src/api';
+import { sb, signIn, signUp, listChats, listMessages, sendMessage, openDm, reportMessage, peerReadAt, markRead, listGames, startGame, gameMove, startCall, setCall, listCalls, listStatuses, postStatus, uploadMedia, sendMedia, sendKind, signedUrl, postStatusPhoto, contacts, myProfile, saveProfile } from './src/api';
 import { runCall } from './src/call';
 const notify = (m) => (Platform.OS === 'web' ? window.alert(m) : Alert.alert('Lantern', m));
 
@@ -107,17 +107,26 @@ function Chats({ chats, open, newChat, onCamera }) {
 }
 
 
-function You({ name, onOut }) {
-  const rows = [['person-outline', 'Account: ' + name], ['lock-closed-outline', 'Messages are not end-to-end encrypted']];
-  const rows2 = [];
-  const Card = ({ r }) => (<View style={s.card}>{r.map(([ic, t], i) => (<View key={t} style={s.setRow}><Ionicons name={ic} size={24} color="#111" /><View style={[s.setBody, i === r.length - 1 && { borderBottomWidth: 0 }]}><Text style={{ fontSize: 17 }}>{t}</Text><Ionicons name="chevron-forward" size={18} color="#8E8E93" /></View></View>))}</View>);
+function You({ name, me, onOut }) {
+  const [edit, setEdit] = useState(false); const [priv, setPriv] = useState(false); const [dn, setDn] = useState(''); const [bio, setBio] = useState(''); const [disp, setDisp] = useState(name);
+  useEffect(() => { myProfile(me).then((p) => { if (p.display_name) setDisp(p.display_name); setDn(p.display_name || ''); setBio(p.bio || ''); }); }, [me]);
+  const save = async () => { const { error } = await saveProfile(me, dn.trim().slice(0, 40), bio.trim().slice(0, 140)); if (error) return notify(error.message); setDisp(dn.trim() || name); setEdit(false); };
+  const rows = [['person-outline', 'Profile', () => setEdit(true)], ['lock-closed-outline', 'Privacy', () => setPriv(true)]];
   return (
     <ScrollView style={s.screen}>
-      
-      <View style={{ alignItems: 'center', marginBottom: 14 }}><Avatar size={72} color="#B8C0C8" /><Text style={{ fontSize: 20, fontWeight: '600', marginTop: 8 }}>{name}</Text></View>
-      <Card r={rows} /><View style={{ height: 22 }} />
+      <View style={{ alignItems: 'center', marginTop: 40, marginBottom: 14 }}><Avatar size={72} color="#B8C0C8" /><Text style={{ fontSize: 20, fontWeight: '600', marginTop: 8 }}>{disp}</Text><Text style={{ color: '#888' }}>@{name}</Text>{!!bio && <Text style={{ color: '#555', marginTop: 4 }}>{bio}</Text>}</View>
+      <View style={s.card}>{rows.map(([ic, t, fn], i) => (<Pressable key={t} onPress={fn} style={s.setRow}><Ionicons name={ic} size={24} color="#111" /><View style={[s.setBody, i === rows.length - 1 && { borderBottomWidth: 0 }]}><Text style={{ fontSize: 17 }}>{t}</Text><Ionicons name="chevron-forward" size={18} color="#8E8E93" /></View></Pressable>))}</View>
+      <View style={{ height: 22 }} />
       <Pressable onPress={onOut} style={s.card}><Text style={{ color: '#D00', fontSize: 17, padding: 16 }}>Log out</Text></Pressable>
-      <Text style={{ color: '#888', fontSize: 12, padding: 20, textAlign: 'center' }}>Not end-to-end encrypted. Admins can see reported content.</Text>
+      <Modal transparent visible={edit} animationType="fade" onRequestClose={() => setEdit(false)}><View style={{ flex: 1, backgroundColor: '#0006', justifyContent: 'center', padding: 30 }}><View style={{ backgroundColor: '#fff', borderRadius: 18, padding: 18 }}>
+        <Text style={{ fontSize: 18, fontWeight: '600', marginBottom: 10 }}>Edit profile</Text>
+        <TextInput style={s.field} placeholder="Display name" value={dn} onChangeText={setDn} maxLength={40} />
+        <TextInput style={s.field} placeholder="About" value={bio} onChangeText={setBio} maxLength={140} />
+        <Pressable style={s.btn} onPress={save}><Text style={s.btnT}>Save</Text></Pressable><Pressable onPress={() => setEdit(false)}><Text style={{ textAlign: 'center', color: '#666' }}>Cancel</Text></Pressable></View></View></Modal>
+      <Modal transparent visible={priv} animationType="fade" onRequestClose={() => setPriv(false)}><View style={{ flex: 1, backgroundColor: '#0006', justifyContent: 'center', padding: 30 }}><View style={{ backgroundColor: '#fff', borderRadius: 18, padding: 18 }}>
+        <Text style={{ fontSize: 18, fontWeight: '600', marginBottom: 10 }}>Privacy</Text>
+        <Text style={{ color: '#333', lineHeight: 21 }}>Messages are not end-to-end encrypted. Lantern admins cannot browse your chats; they can see a message and its attachment only after someone reports it. You sign in with your email and password; there is no password recovery yet, so keep your password safe.</Text>
+        <Pressable style={[s.btn, { marginTop: 14 }]} onPress={() => setPriv(false)}><Text style={s.btnT}>Close</Text></Pressable></View></View></Modal>
     </ScrollView>
   );
 }
@@ -196,7 +205,7 @@ function CallScreen({ c, me, end }) {
 }
 
 function Thread({ chat, me, back, onCall }) {
-  const [msgs, setMsgs] = useState([]); const [peerRead, setPeerRead] = useState(null); const [t, setT] = useState(''); const ref = useRef(); const [games, setGames] = useState([]); const [sheet, setSheet] = useState(false); const [stk, setStk] = useState(false); const [recing, setRecing] = useState(false); const rec = useAudioRecorder(RecordingPresets.HIGH_QUALITY); const t0 = useRef(0);
+  const [msgs, setMsgs] = useState([]); const [peerRead, setPeerRead] = useState(null); const [t, setT] = useState(''); const ref = useRef(); const [games, setGames] = useState([]); const [sheet, setSheet] = useState(false); const [stk, setStk] = useState(false); const [recing, setRecing] = useState(false); const rec = useAudioRecorder(RecordingPresets.HIGH_QUALITY); const t0 = useRef(0); const [replyTo, setReplyTo] = useState(null); const [online, setOnline] = useState(false); const [typing, setTyping] = useState(false); const presCh = useRef(); const tyT = useRef();
   useEffect(() => {
     let on = true;
     const load = async () => { if (!on) return; setMsgs(await listMessages(chat.id)); setPeerRead(await peerReadAt(chat.id, me)); setGames(await listGames(chat.id)); markRead(chat.id, me); };
@@ -208,8 +217,17 @@ function Thread({ chat, me, back, onCall }) {
       .subscribe();
     return () => { on = false; sb.removeChannel(ch); };
   }, [chat.id]);
+  useEffect(() => {
+    const ch = sb.channel('pres' + chat.id, { config: { presence: { key: me } } });
+    const sync = () => { const st = ch.presenceState(); setOnline(Object.keys(st).some((k) => k !== me)); };
+    ch.on('presence', { event: 'sync' }, sync).on('broadcast', { event: 'typing' }, ({ payload }) => { if (payload?.u !== me) { setTyping(true); clearTimeout(tyT.current); tyT.current = setTimeout(() => setTyping(false), 2500); } })
+      .subscribe(async (st) => { if (st === 'SUBSCRIBED') await ch.track({ at: Date.now() }); });
+    presCh.current = ch;
+    return () => { clearTimeout(tyT.current); sb.removeChannel(ch); };
+  }, [chat.id]);
+  const onType = (v) => { setT(v); presCh.current?.send({ type: 'broadcast', event: 'typing', payload: { u: me } }); };
   const send = async () => { const b = t.trim(); if (!b) return; setT('');
-    const { error } = await sendMessage(chat.id, me, b); if (error) notify(error.message); };
+    const rid = replyTo?.id; setReplyTo(null); const { error } = await sendMessage(chat.id, me, b, rid); if (error) notify(error.message); };
   const fail = (e) => notify(e?.message || String(e));
   const sendPhoto = async (cam) => { setSheet(false); try {
     const perm = cam ? await ImagePicker.requestCameraPermissionsAsync() : { granted: true };
@@ -234,13 +252,14 @@ function Thread({ chat, me, back, onCall }) {
     <View style={[s.screen, { backgroundColor: CHATBG }]}>
       <View style={[s.topBar, { backgroundColor: 'transparent' }]}>
         <Pressable onPress={back} style={[s.round, { width: 66, flexDirection: 'row' }]}><Ionicons name="chevron-back" size={24} color="#111" /></Pressable>
-        <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, marginLeft: 8 }}><Avatar size={36} color="#D7B9A5" /><Text style={{ fontSize: 17, fontWeight: '600', marginLeft: 8 }} numberOfLines={1}>{chat.name}</Text></View>
+        <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, marginLeft: 8 }}><Avatar size={36} color="#D7B9A5" /><View style={{ marginLeft: 8, flex: 1 }}><Text style={{ fontSize: 17, fontWeight: '600' }} numberOfLines={1}>{chat.name}</Text>{(typing || online) ? <Text style={{ fontSize: 12, color: GD }}>{typing ? 'typing...' : 'online'}</Text> : null}</View></View>
         <Pressable onPress={() => onCall(chat)} style={s.round}><Ionicons name="call-outline" size={22} color="#111" /></Pressable>
       </View>
       <FlatList ref={ref} data={items} keyExtractor={(m) => String(m.id)} contentContainerStyle={{ padding: 10 }} onContentSizeChange={() => ref.current?.scrollToEnd?.({ animated: false })}
         renderItem={({ item: m }) => m.game ? <GameCard g={m.game} me={me} move={move} /> : (
-          <Pressable onLongPress={() => !m.mine && m.orig && reportMessage(me, m.orig.id, 'Reported from chat').then(() => notify('Reported to admins'))} style={[s.bubble, m.mine ? s.out : s.inn]}>
-                        <MsgBody m={m.raw || { body: m.body }} />
+          <Pressable onLongPress={() => { if (!m.orig) return; const btns = [{ text: 'Reply', onPress: () => setReplyTo({ id: m.orig.id, text: m.orig.kind && m.orig.kind !== 'text' ? ({ image: 'Photo', voice: 'Voice message', document: 'Document', location: 'Location', sticker: 'Sticker' })[m.orig.kind] : m.orig.body }) }]; if (!m.mine) btns.push({ text: 'Report', onPress: () => reportMessage(me, m.orig.id, 'Reported from chat').then(() => notify('Reported to admins')) }); btns.push({ text: 'Cancel', style: 'cancel' }); Alert.alert('Message', undefined, btns); }} style={[s.bubble, m.mine ? s.out : s.inn]}>
+                        {m.orig?.reply_to ? (<View style={s.quote}><Text style={{ fontSize: 13, color: '#444' }} numberOfLines={2}>{(() => { const q = msgs.find((x) => x.id === m.orig.reply_to); return q ? (q.removed ? 'This message was removed' : q.kind && q.kind !== 'text' ? ({ image: 'Photo', voice: 'Voice message', document: 'Document', location: 'Location', sticker: 'Sticker' })[q.kind] : q.body) : 'Original message'; })()}</Text></View>) : null}
+            <MsgBody m={m.raw || { body: m.body }} />
             <View style={{ flexDirection: 'row', alignSelf: 'flex-end', alignItems: 'center' }}><Text style={s.tm}>{m.time}</Text>{m.ticks && <Ionicons name={m.read ? 'checkmark-done' : 'checkmark'} size={15} color={m.read ? '#34B7F1' : '#8696A0'} style={{ marginLeft: 3 }} />}</View>
           </Pressable>)} />
       <Modal transparent visible={sheet} animationType="slide" onRequestClose={() => setSheet(false)}><Pressable style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: '#0003' }} onPress={() => setSheet(false)}><View style={{ backgroundColor: '#DDE0E8', borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 18, flexDirection: 'row', flexWrap: 'wrap' }}>
@@ -250,9 +269,10 @@ function Thread({ chat, me, back, onCall }) {
       <Modal transparent visible={stk} animationType="slide" onRequestClose={() => setStk(false)}><Pressable style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: '#0003' }} onPress={() => setStk(false)}><View style={{ backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 14, flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center' }}>
         {STICKERS.map((x) => (<Pressable key={x[0]} onPress={() => sendSticker(x[0])} style={{ margin: 6 }}><StickerArt id={x[0]} size={78} /></Pressable>))}
       </View></Pressable></Modal>
+      {replyTo ? (<View style={[s.quote, { marginHorizontal: 8, flexDirection: 'row', alignItems: 'center' }]}><Text style={{ flex: 1, color: '#444' }} numberOfLines={1}>Replying to: {replyTo.text}</Text><Pressable onPress={() => setReplyTo(null)}><Ionicons name="close" size={20} color="#444" /></Pressable></View>) : null}
       <View style={{ flexDirection: 'row', alignItems: 'center', padding: 8 }}>
         <Pressable onPress={() => setSheet(true)} style={{ paddingHorizontal: 6 }}><Ionicons name="add" size={32} color="#111" /></Pressable>
-        <View style={s.input}><TextInput style={{ flex: 1, fontSize: 17 }} value={recing ? 'Recording... tap the mic to send' : t} editable={!recing} onChangeText={setT} placeholder="Message" onSubmitEditing={send} /><Pressable onPress={() => setStk(true)}><MaterialCommunityIcons name="sticker-emoji" size={24} color="#666" /></Pressable></View>
+        <View style={s.input}><TextInput style={{ flex: 1, fontSize: 17 }} value={recing ? 'Recording... tap the mic to send' : t} editable={!recing} onChangeText={onType} placeholder="Message" onSubmitEditing={send} /><Pressable onPress={() => setStk(true)}><MaterialCommunityIcons name="sticker-emoji" size={24} color="#666" /></Pressable></View>
         {!t.trim() && !recing && <Pressable onPress={() => sendPhoto(true)} style={{ paddingHorizontal: 8 }}><Ionicons name="camera-outline" size={28} color="#111" /></Pressable>}
         {t.trim() ? <Pressable onPress={send} style={[s.round, { backgroundColor: G, width: 40, height: 40 }]}><Ionicons name="send" size={20} color="#fff" /></Pressable>
           : <Pressable onPress={micTap} style={[s.round, { backgroundColor: recing ? '#E0143C' : G, width: 40, height: 40 }]}><Ionicons name={recing ? 'stop' : 'mic'} size={22} color="#fff" /></Pressable>}
@@ -297,7 +317,7 @@ export default function App() {
           {tab === 'updates' && <Updates me={me} />}
           {tab === 'calls' && <Calls me={me} call={placeCall} />}
           {tab === 'chats' && <Chats chats={list} open={setCur} newChat={newChat} onCamera={postPhotoStatus} />}
-          {tab === 'you' && <You name={name} onOut={() => sb.auth.signOut()} />}
+          {tab === 'you' && <You name={name} me={me} onOut={() => sb.auth.signOut()} />}
           <View style={s.tabbar}>
             <Tab icon="aperture-outline" label="Updates" on={tab === 'updates'} press={() => setTab('updates')} />
             <Tab icon="call-outline" label="Calls" on={tab === 'calls'} press={() => setTab('calls')} />

@@ -31,10 +31,10 @@ export async function listChats(me) {
   return out.sort((a, b) => String(b.time).localeCompare(String(a.time)));
 }
 export async function listMessages(chat) {
-  const { data } = await sb.from('messages').select('id,sender_id,body,removed,created_at,kind,media_path,duration').eq('chat_id', chat).order('created_at', { ascending: true }).limit(200);
+  const { data } = await sb.from('messages').select('id,sender_id,body,removed,created_at,kind,media_path,duration,reply_to').eq('chat_id', chat).order('created_at', { ascending: true }).limit(200);
   return data || [];
 }
-export const sendMessage = (chat, me, body) => sb.from('messages').insert({ chat_id: chat, sender_id: me, body });
+export const sendMessage = (chat, me, body, replyTo) => sb.from('messages').insert({ chat_id: chat, sender_id: me, body, reply_to: replyTo || null });
 export async function openDm(username) {
   const { data: p } = await sb.from('profiles').select('id').eq('username', username.trim().toLowerCase()).maybeSingle();
   if (!p) throw new Error('No such username');
@@ -99,3 +99,6 @@ export async function contacts(me) {
   const { data: profs } = await sb.from('profiles').select('id,username,display_name').in('id', uids);
   return profs || [];
 }
+
+export async function myProfile(me) { const { data } = await sb.from('profiles').select('username,display_name,bio').eq('id', me).maybeSingle(); return data || {}; }
+export const saveProfile = (me, display_name, bio) => sb.from('profiles').update({ display_name, bio }).eq('id', me);
