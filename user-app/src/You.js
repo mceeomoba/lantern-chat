@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { View, Text, TextInput, Pressable, ScrollView, Modal, Alert, Image, Switch, Share, StyleSheet, Platform } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
-import { sb, avatarUrl } from './api';
+import { sb, avatarUrl, friendly } from './api';
 import { Glass } from './glass';
 import { useSettings, setSetting, wallpapers, sizes } from './settings';
 
@@ -93,7 +93,7 @@ export default function You({ me, name, onOut }) {
     } catch (e) { note(e.message || 'Could not upload photo'); }
   };
   const savePhone = async (v) => { const x = v.trim(); const { error } = x ? await sb.from('profile_private').upsert({ id: me, phone: x }) : await sb.from('profile_private').delete().eq('id', me); if (error) return note('Enter a valid phone number (digits, optional +).'); setAsk(null); load(); };
-  const saveUser = async (v) => { const { error } = await sb.rpc('change_username', { u: v }); if (error) return note(error.message); setAsk(null); load(); };
+  const saveUser = async (v) => { const { error } = await sb.rpc('change_username', { u: v }); if (error) return note(friendly(error)); setAsk(null); load(); };
   const close = () => { setPage(null); load(); };
 
   const main = (

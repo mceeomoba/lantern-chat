@@ -5,7 +5,7 @@ import * as DocumentPicker from 'expo-document-picker';
 import * as Location from 'expo-location';
 import { createAudioPlayer, setAudioModeAsync } from 'expo-audio';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { sb, signIn, signUp, listChats, listMessages, sendMessage, openDm, reportMessage, peerReadAt, markRead, listGames, startGame, gameMove, startCall, setCall, listCalls, listStatuses, postStatus, uploadMedia, sendMedia, sendKind, signedUrl, postStatusPhoto, contacts, myProfile, saveProfile, registerPush, unregisterPush, avatarUrl } from './src/api';
+import { sb, friendly, signIn, signUp, listChats, listMessages, sendMessage, openDm, reportMessage, peerReadAt, markRead, listGames, startGame, gameMove, startCall, setCall, listCalls, listStatuses, postStatus, uploadMedia, sendMedia, sendKind, signedUrl, postStatusPhoto, contacts, myProfile, saveProfile, registerPush, unregisterPush, avatarUrl } from './src/api';
 import messaging from '@react-native-firebase/messaging';
 import { runCall } from './src/call';
 import YouPage from './src/You';
@@ -63,7 +63,7 @@ function MsgBody({ m }) {
 
 function Auth() {
   const [em, setEm] = useState(''); const [u, setU] = useState(''); const [p, setP] = useState(''); const [err, setErr] = useState(''); const [busy, setBusy] = useState(false); const [up, setUp] = useState(false);
-  const go = async (up) => { setBusy(true); setErr(''); try { if (up) { await signUp(em, u, p); } else { await signIn(em, p); } } catch (e) { setErr(e.message); } setBusy(false); };
+  const go = async (up) => { setBusy(true); setErr(''); try { if (up) { await signUp(em, u, p); } else { await signIn(em, p); } } catch (e) { setErr(friendly(e)); } setBusy(false); };
   return (
     <View style={[s.screen, { padding: 28, justifyContent: 'center', backgroundColor: '#fff' }]}>
       <View style={{ alignItems: 'center', marginBottom: 28 }}>

@@ -111,3 +111,10 @@ export const saveProfile = (me, display_name, bio) => sb.from('profiles').update
 export const registerPush = (t) => sb.rpc('register_push_token', { t, a: 'chat' });
 export const unregisterPush = (t) => sb.rpc('unregister_push_token', { t });
 export const avatarUrl = (p) => (p ? `${SUPABASE_URL}/storage/v1/object/public/avatars/${p}` : null);
+export function friendly(e) {
+  const m = String((e && e.message) || e || '');
+  if (/profiles_username_key|duplicate key|already (taken|exists)|Database error saving new user/i.test(m)) return 'That username is taken. Try another one.';
+  if (/User already registered|already been registered/i.test(m)) return 'An account with that email already exists. Log in instead.';
+  if (/Invalid login credentials/i.test(m)) return 'Wrong email/username or password.';
+  return m;
+}
