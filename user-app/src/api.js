@@ -60,3 +60,22 @@ export async function startGame(chat) {
 export async function gameMove(id, cell) {
   const { error } = await sb.rpc('game_move', { g: id, cell }); if (error) throw error;
 }
+export async function startCall(chat) { const { data, error } = await sb.rpc('start_call', { c: chat }); if (error) throw error; return data; }
+export const setCall = (id, s) => sb.rpc('set_call', { g: id, s });
+export async function listCalls(me) {
+  const { data } = await sb.from('calls').select('id,chat_id,caller,callee,status,created_at,answered_at,ended_at').order('created_at', { ascending: false }).limit(50);
+  const rows = data || [];
+  const ids = [...new Set(rows.map((r) => (r.caller === me ? r.callee : r.caller)))];
+  const { data: profs } = ids.length ? await sb.from('profiles').select('id,username,display_name').in('id', ids) : { data: [] };
+  const pm = Object.fromEntries((profs || []).map((p) => [p.id, p]));
+  return rows.map((r) => { const other = r.caller === me ? r.callee : r.caller; return { ...r, out: r.caller === me, name: pm[other]?.display_name || pm[other]?.username || 'User' }; });
+}
+export async function listStatuses() {
+  const { data } = await sb.from('statuses').select('id,user_id,body,created_at').order('created_at', { ascending: false }).limit(100);
+  const rows = data || [];
+  const ids = [...new Set(rows.map((r) => r.user_id))];
+  const { data: profs } = ids.length ? await sb.from('profiles').select('id,username,display_name').in('id', ids) : { data: [] };
+  const pm = Object.fromEntries((profs || []).map((p) => [p.id, p]));
+  return rows.map((r) => ({ ...r, name: pm[r.user_id]?.display_name || pm[r.user_id]?.username || 'User' }));
+}
+export const postStatus = (body) => sb.from('statuses').insert({ body });

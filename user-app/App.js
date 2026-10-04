@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, TextInput, Pressable, FlatList, ScrollView, StyleSheet, Platform, StatusBar, Modal, Alert } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { sb, signIn, signUp, listChats, listMessages, sendMessage, openDm, reportMessage, peerReadAt, markRead, listGames, startGame, gameMove } from './src/api';
+import { sb, signIn, signUp, listChats, listMessages, sendMessage, openDm, reportMessage, peerReadAt, markRead, listGames, startGame, gameMove, startCall, setCall, listCalls, listStatuses, postStatus } from './src/api';
+import { runCall } from './src/call';
 const notify = (m) => (Platform.OS === 'web' ? window.alert(m) : Alert.alert('Lantern', m));
 
 const G = '#25D366', GD = '#128C7E', OUT = '#D9FDD3', BG = '#F2F2F7', CHATBG = '#EFEAE2';
@@ -107,7 +108,63 @@ function GameCard({ g, me, move }) {
     </View>);
 }
 
-function Thread({ chat, me, back }) {
+const ago = (t) => { const d = new Date(t); const same = d.toDateString() === new Date().toDateString(); return same ? d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : d.toLocaleDateString(); };
+
+function Updates({ me }) {
+  const [rows, setRows] = useState([]); const [t, setT] = useState('');
+  const load = async () => setRows(await listStatuses());
+  useEffect(() => { load(); const ch = sb.channel('st').on('postgres_changes', { event: '*', schema: 'public', table: 'statuses' }, load).subscribe(); return () => { sb.removeChannel(ch); }; }, []);
+  const post = async () => { const b = t.trim(); if (!b) return; setT(''); const { error } = await postStatus(b); if (error) notify(error.message); };
+  return (
+    <View style={s.screen}>
+      <Text style={[s.h1, { marginTop: 50 }]}>Updates</Text>
+      <View style={[s.search, { marginBottom: 10 }]}><TextInput style={{ flex: 1, fontSize: 16 }} placeholder="Share a status (disappears in 24h)" value={t} onChangeText={setT} onSubmitEditing={post} /><Pressable onPress={post}><Ionicons name="send" size={20} color={GD} /></Pressable></View>
+      <Text style={{ fontSize: 20, fontWeight: '700', paddingHorizontal: 16, marginBottom: 6 }}>Status</Text>
+      <FlatList data={rows} keyExtractor={(r) => String(r.id)} renderItem={({ item }) => (
+        <View style={s.row}><View style={{ borderWidth: 2.5, borderColor: G, borderRadius: 30, padding: 2 }}><Avatar size={46} color="#C9CED6" /></View>
+          <View style={s.rowBody}><Text style={s.rowName}>{item.user_id === me ? 'My status' : item.name}</Text><Text style={s.rowLast} numberOfLines={2}>{item.body}</Text><Text style={s.rowTime}>{ago(item.created_at)}</Text></View></View>)}
+        ListEmptyComponent={<Text style={{ textAlign: 'center', color: '#888', marginTop: 30 }}>No recent updates.</Text>} />
+    </View>);
+}
+
+function Calls({ me, call }) {
+  const [rows, setRows] = useState([]);
+  const load = async () => setRows(await listCalls(me));
+  useEffect(() => { load(); const ch = sb.channel('cl').on('postgres_changes', { event: '*', schema: 'public', table: 'calls' }, load).subscribe(); return () => { sb.removeChannel(ch); }; }, []);
+  const label = (r) => (r.status === 'ringing' || r.status === 'missed') ? (r.out ? 'No answer' : 'Missed') : r.status === 'declined' ? 'Declined' : r.out ? 'Outgoing' : 'Incoming';
+  return (
+    <View style={s.screen}>
+      <Text style={[s.h1, { marginTop: 50 }]}>Calls</Text>
+      <Text style={{ fontSize: 20, fontWeight: '700', paddingHorizontal: 16, marginBottom: 6 }}>Recent</Text>
+      <FlatList data={rows} keyExtractor={(r) => String(r.id)} renderItem={({ item }) => {
+        const bad = !item.out && (item.status === 'missed' || item.status === 'ringing');
+        return (<Pressable onPress={() => call(item)} style={s.row}><Avatar color="#C9CED6" />
+          <View style={[s.rowBody, { flexDirection: 'row', alignItems: 'center' }]}><View style={{ flex: 1 }}><Text style={[s.rowName, bad && { color: '#E0143C' }]}>{item.name}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}><Ionicons name={item.out ? 'arrow-up' : 'arrow-down'} size={14} color="#8E8E93" /><Text style={s.rowLast}> {label(item)}</Text></View></View>
+            <Text style={s.rowTime}>{ago(item.created_at)}</Text></View></Pressable>); }}
+        ListEmptyComponent={<Text style={{ textAlign: 'center', color: '#888', marginTop: 30 }}>No calls yet. Open a chat and tap the phone icon.</Text>} />
+    </View>);
+}
+
+function CallScreen({ c, me, end }) {
+  const [state, setState] = useState(c.caller ? 'Calling...' : 'Connecting...'); const [muted, setMuted] = useState(false); const h = useRef();
+  useEffect(() => {
+    let alive = true;
+    runCall({ id: c.id, caller: c.caller, onState: (x) => { if (!alive) return; if (x === 'connected') setState('Connected'); else { setState(x === 'failed' ? 'Call failed' : 'Call ended'); setTimeout(end, 900); } } })
+      .then((x) => { h.current = x; }).catch((e) => { notify(e.message); setCall(c.id, 'ended'); end(); });
+    return () => { alive = false; };
+  }, []);
+  return (
+    <View style={{ flex: 1, backgroundColor: '#1C1C1E', alignItems: 'center', paddingTop: 120 }}>
+      <Avatar size={110} color="#3A3A3C" /><Text style={{ color: '#fff', fontSize: 28, fontWeight: '600', marginTop: 20 }}>{c.name}</Text><Text style={{ color: '#aaa', fontSize: 17, marginTop: 6 }}>{state}</Text>
+      <View style={{ flexDirection: 'row', position: 'absolute', bottom: 80 }}>
+        <Pressable onPress={() => { const m = !muted; setMuted(m); h.current?.mute(m); }} style={[s.round, { width: 64, height: 64, borderRadius: 32, marginHorizontal: 20, backgroundColor: muted ? '#fff' : '#3A3A3C' }]}><Ionicons name={muted ? 'mic-off' : 'mic'} size={28} color={muted ? '#111' : '#fff'} /></Pressable>
+        <Pressable onPress={() => (h.current ? h.current.hang() : (setCall(c.id, 'ended'), end()))} style={[s.round, { width: 64, height: 64, borderRadius: 32, marginHorizontal: 20, backgroundColor: '#E0143C' }]}><Ionicons name="call" size={28} color="#fff" style={{ transform: [{ rotate: '135deg' }] }} /></Pressable>
+      </View>
+    </View>);
+}
+
+function Thread({ chat, me, back, onCall }) {
   const [msgs, setMsgs] = useState([]); const [peerRead, setPeerRead] = useState(null); const [t, setT] = useState(''); const ref = useRef(); const [games, setGames] = useState([]); const [sheet, setSheet] = useState(false);
   useEffect(() => {
     let on = true;
@@ -132,6 +189,7 @@ function Thread({ chat, me, back }) {
       <View style={[s.topBar, { backgroundColor: 'transparent' }]}>
         <Pressable onPress={back} style={[s.round, { width: 66, flexDirection: 'row' }]}><Ionicons name="chevron-back" size={24} color="#111" /></Pressable>
         <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, marginLeft: 8 }}><Avatar size={36} color="#D7B9A5" /><Text style={{ fontSize: 17, fontWeight: '600', marginLeft: 8 }} numberOfLines={1}>{chat.name}</Text></View>
+        <Pressable onPress={() => onCall(chat)} style={s.round}><Ionicons name="call-outline" size={22} color="#111" /></Pressable>
       </View>
       <FlatList ref={ref} data={items} keyExtractor={(m) => String(m.id)} contentContainerStyle={{ padding: 10 }} onContentSizeChange={() => ref.current?.scrollToEnd?.({ animated: false })}
         renderItem={({ item: m }) => m.game ? <GameCard g={m.game} me={me} move={move} /> : (
@@ -165,6 +223,9 @@ export default function App() {
     const ch = sb.channel('list' + me).on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, refresh).on('postgres_changes', { event: '*', schema: 'public', table: 'chat_members' }, refresh).subscribe();
     return () => { sb.removeChannel(ch); };
   }, [me, cur]);
+  const [live, setLive] = useState(null); const [incoming, setIncoming] = useState(null);
+  const placeCall = async (x) => { try { const id = await startCall(x.chat_id || x.id); setLive({ id, caller: true, name: x.name }); } catch (e) { notify(e.message); } };
+  useEffect(() => { if (!me) return; const ch = sb.channel('inc' + me).on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'calls', filter: `callee=eq.${me}` }, async (p) => { const r = p.new; const { data } = await sb.from('profiles').select('username,display_name').eq('id', r.caller).maybeSingle(); setIncoming({ id: r.id, name: data?.display_name || data?.username || 'Unknown' }); }).on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'calls', filter: `callee=eq.${me}` }, (p) => { if (p.new.status !== 'ringing') setIncoming((i) => (i && i.id === p.new.id ? null : i)); }).subscribe(); return () => { sb.removeChannel(ch); }; }, [me]);
   const [askOpen, setAskOpen] = useState(false); const [askU, setAskU] = useState('');
   const newChat = () => { setAskU(''); setAskOpen(true); };
   const goDm = async () => { const u = askU; setAskOpen(false); if (!u.trim()) return; try { const id = await openDm(u); await refresh(); setCur({ id, name: u }); } catch (e) { notify(e.message); } };
@@ -174,11 +235,17 @@ export default function App() {
     <View style={s.root}>
       <StatusBar barStyle="dark-content" />
       <Modal transparent visible={askOpen} animationType="fade" onRequestClose={() => setAskOpen(false)}><View style={{ flex: 1, backgroundColor: '#0006', justifyContent: 'center', padding: 30 }}><View style={{ backgroundColor: '#fff', borderRadius: 18, padding: 18 }}><Text style={{ fontSize: 18, fontWeight: '600', marginBottom: 10 }}>New chat</Text><TextInput style={s.field} placeholder="Username" autoCapitalize="none" value={askU} onChangeText={setAskU} /><Pressable style={s.btn} onPress={goDm}><Text style={s.btnT}>Start chat</Text></Pressable><Pressable onPress={() => setAskOpen(false)}><Text style={{ textAlign: 'center', color: '#666' }}>Cancel</Text></Pressable></View></View></Modal>
-      {cur ? <Thread chat={cur} me={me} back={() => setCur(null)} /> : (
+      {live ? <CallScreen c={live} me={me} end={() => setLive(null)} /> : null}
+      {incoming && !live ? (<View style={{ position: 'absolute', top: 40, left: 12, right: 12, zIndex: 9, backgroundColor: '#1C1C1E', borderRadius: 20, padding: 16, flexDirection: 'row', alignItems: 'center' }}><View style={{ flex: 1 }}><Text style={{ color: '#fff', fontSize: 17, fontWeight: '600' }}>{incoming.name}</Text><Text style={{ color: '#aaa' }}>Lantern voice call</Text></View><Pressable onPress={() => { setCall(incoming.id, 'declined'); setIncoming(null); }} style={[s.round, { backgroundColor: '#E0143C', marginRight: 10 }]}><Ionicons name="call" size={22} color="#fff" style={{ transform: [{ rotate: '135deg' }] }} /></Pressable><Pressable onPress={() => { setLive({ id: incoming.id, caller: false, name: incoming.name }); setIncoming(null); }} style={[s.round, { backgroundColor: G }]}><Ionicons name="call" size={22} color="#fff" /></Pressable></View>) : null}
+      {live ? null : cur ? <Thread chat={cur} me={me} back={() => setCur(null)} onCall={placeCall} /> : (
         <>
+          {tab === 'updates' && <Updates me={me} />}
+          {tab === 'calls' && <Calls me={me} call={placeCall} />}
           {tab === 'chats' && <Chats chats={list} open={setCur} newChat={newChat} />}
           {tab === 'you' && <You name={name} onOut={() => sb.auth.signOut()} />}
           <View style={s.tabbar}>
+            <Tab icon="aperture-outline" label="Updates" on={tab === 'updates'} press={() => setTab('updates')} />
+            <Tab icon="call-outline" label="Calls" on={tab === 'calls'} press={() => setTab('calls')} />
             <Tab icon="chatbubbles" label="Chats" on={tab === 'chats'} badge={chats.reduce((a, c) => a + (c.unread || 0), 0)} press={() => setTab('chats')} />
             <Tab icon="person-circle-outline" label="You" on={tab === 'you'} press={() => setTab('you')} />
           </View>
