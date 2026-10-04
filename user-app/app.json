@@ -50,7 +50,15 @@
           "locationWhenInUsePermission": "Lantern shares your location when you choose to send it."
         }
       ],
-      "expo-document-picker"
+      "expo-document-picker",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 200,
+          "backgroundColor": "#FFB347"
+        }
+      ]
     ]
   }
 }
