@@ -80,9 +80,9 @@ export async function listStatuses() {
 }
 export const postStatus = (body) => sb.from('statuses').insert({ body });
 
-export async function uploadMedia(me, uri, mime, ext) {
+export async function uploadMedia(me, uri, mime, ext, scope) {
   const buf = await (await fetch(uri)).arrayBuffer();
-  const path = `${me}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+  const path = `${scope}/${me}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
   const { error } = await sb.storage.from('media').upload(path, buf, { contentType: mime });
   if (error) throw error;
   return path;
