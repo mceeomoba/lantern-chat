@@ -6,11 +6,15 @@
     "@config-plugins/react-native-webrtc": "^15.0.2",
     "@expo/metro-runtime": "~57.0.16",
     "@expo/vector-icons": "^15.0.2",
+    "@react-native-firebase/app": "26.4.0",
+    "@react-native-firebase/messaging": "26.4.0",
     "@supabase/supabase-js": "^2.117.2",
     "expo": "~57.0.26",
     "expo-audio": "~57.0.5",
+    "expo-blur": "~57.0.3",
     "expo-document-picker": "~57.0.3",
     "expo-image-picker": "~57.0.20",
+    "expo-linear-gradient": "~57.0.2",
     "expo-location": "~57.0.20",
     "expo-splash-screen": "~57.0.9",
     "expo-status-bar": "~57.0.1",
@@ -19,9 +23,7 @@
     "react-native": "0.86.3",
     "react-native-safe-area-context": "~5.7.0",
     "react-native-web": "^0.21.2",
-    "react-native-webrtc": "^124.0.8",
-    "@react-native-firebase/app": "26.4.0",
-    "@react-native-firebase/messaging": "26.4.0"
+    "react-native-webrtc": "^124.0.8"
   },
   "scripts": {
     "start": "expo start",

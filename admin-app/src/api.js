@@ -11,3 +11,4 @@ export const removeMsg = (mid) => sb.rpc('admin_remove_message', { mid });
 export const getConfig = async () => (await sb.from('app_config').select('*')).data || [];
 export const setConfig = (key, value) => sb.from('app_config').upsert({ key, value });
 export const getAudit = async () => (await sb.from('audit_log').select('*').order('created_at', { ascending: false }).limit(100)).data || [];
+export const getFeedback = async () => { const { data } = await sb.from('feedback').select('id,body,created_at').order('created_at', { ascending: false }).limit(100); return data || []; };

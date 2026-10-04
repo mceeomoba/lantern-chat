@@ -17,7 +17,7 @@ export async function listChats(me) {
   if (!ids.length) return [];
   const { data: chats } = await sb.from('chats').select('id,kind,title').in('id', ids);
   const { data: members } = await sb.from('chat_members').select('chat_id,user_id').in('chat_id', ids);
-  const { data: profs } = await sb.from('profiles').select('id,username,display_name');
+  const { data: profs } = await sb.from('profiles').select('id,username,display_name,avatar_path,status_text,bio,links');
   const pm = Object.fromEntries((profs || []).map((p) => [p.id, p]));
   const out = [];
   for (const c of chats || []) {
@@ -26,7 +26,7 @@ export async function listChats(me) {
     const name = c.kind === 'group' ? c.title : (pm[other?.user_id]?.display_name || pm[other?.user_id]?.username || 'Chat');
     const mine = (mem || []).find((m) => m.chat_id === c.id);
     const { count } = await sb.from('messages').select('id', { count: 'exact', head: true }).eq('chat_id', c.id).neq('sender_id', me).gt('created_at', mine?.last_read_at || '1970-01-01');
-    out.push({ kind: c.kind, unread: count || 0, id: c.id, name, last: last?.[0]?.removed ? 'This message was removed' : ({ image: 'Photo', voice: 'Voice message', document: 'Document', location: 'Location', sticker: 'Sticker' })[last?.[0]?.kind] || last?.[0]?.body || '', time: last?.[0]?.created_at });
+    out.push({ avatar: c.kind === 'group' ? null : pm[other?.user_id]?.avatar_path, other: c.kind === 'group' ? null : pm[other?.user_id], kind: c.kind, unread: count || 0, id: c.id, name, last: last?.[0]?.removed ? 'This message was removed' : ({ image: 'Photo', voice: 'Voice message', document: 'Document', location: 'Location', sticker: 'Sticker' })[last?.[0]?.kind] || last?.[0]?.body || '', time: last?.[0]?.created_at });
   }
   return out.sort((a, b) => String(b.time).localeCompare(String(a.time)));
 }
@@ -43,11 +43,7 @@ export async function openDm(username) {
   return data;
 }
 export const reportMessage = (me, msgId, why) => sb.from('reports').insert({ reporter: me, target_type: 'message', target_id: String(msgId), reason: why });
-export async function peerReadAt(chat, me) {
-  const { data } = await sb.from('chat_members').select('last_read_at').eq('chat_id', chat).neq('user_id', me);
-  const t = (data || []).map((d) => d.last_read_at).sort();
-  return t.length ? t[0] : null;
-}
+export async function peerReadAt(chat, me) { const { data } = await sb.rpc('peer_read', { c: chat }); return data || null; }
 export const markRead = (chat, me) => sb.from('chat_members').update({ last_read_at: new Date().toISOString() }).eq('chat_id', chat).eq('user_id', me);
 
 export async function listGames(chat) {
@@ -105,3 +101,4 @@ export const saveProfile = (me, display_name, bio) => sb.from('profiles').update
 
 export const registerPush = (t) => sb.rpc('register_push_token', { t, a: 'chat' });
 export const unregisterPush = (t) => sb.rpc('unregister_push_token', { t });
+export const avatarUrl = (p) => (p ? `${SUPABASE_URL}/storage/v1/object/public/avatars/${p}` : null);
