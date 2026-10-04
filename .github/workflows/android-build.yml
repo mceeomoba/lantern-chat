@@ -1,4 +1,4 @@
-name: android-preview
+name: android-build
 on:
   workflow_dispatch:
   push:
@@ -46,14 +46,15 @@ jobs:
           ./gradlew assembleRelease -x lint -PreactNativeArchitectures=arm64-v8a --no-daemon
       - uses: actions/upload-artifact@v4
         with:
-          name: lantern-${{ matrix.app }}-preview-apk
+          name: ${{ matrix.app }}-apk
           path: ${{ matrix.app }}/android/app/build/outputs/apk/release/*.apk
           retention-days: 7
       - name: Publish APK to release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          TAG=preview-${{ github.run_number }}
-          gh release create "$TAG" --repo "${{ github.repository }}" --title "Lantern preview $TAG" --notes "Debug-signed preview APKs. Not a store release." || true
-          cp ${{ matrix.app }}/android/app/build/outputs/apk/release/app-release.apk lantern-${{ matrix.app }}-$TAG.apk
-          gh release upload "$TAG" lantern-${{ matrix.app }}-$TAG.apk --repo "${{ github.repository }}" --clobber
+          TAG=v1.0.${{ github.run_number }}
+          if [ "${{ matrix.app }}" = "user-app" ]; then F="Lantern-$TAG.apk"; else F="Lantern-Admin-$TAG.apk"; fi
+          gh release create "$TAG" --repo "${{ github.repository }}" --title "Lantern $TAG" --notes "Lantern Android apps. Signed with the debug key, not a store release." || true
+          cp ${{ matrix.app }}/android/app/build/outputs/apk/release/app-release.apk "$F"
+          gh release upload "$TAG" "$F" --repo "${{ github.repository }}" --clobber
