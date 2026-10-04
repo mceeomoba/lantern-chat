@@ -3,7 +3,15 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AppState } from 'react-native';
 import { SUPABASE_URL, SUPABASE_KEY } from './config';
 export const sb = createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { storage: AsyncStorage, autoRefreshToken: true, persistSession: true, detectSessionInUrl: false } });
-AppState.addEventListener('change', (st) => { if (st === 'active') sb.auth.startAutoRefresh(); else sb.auth.stopAutoRefresh(); });
+export const resumeBus = new Set();
+const fireResume = () => resumeBus.forEach((fn) => { try { fn(); } catch (e) {} });
+const keepAlive = () => { try { if (!sb.realtime.isConnected()) sb.realtime.connect(); } catch (e) {} };
+let appActive = true;
+AppState.addEventListener('change', (st) => {
+  appActive = st === 'active';
+  if (appActive) { sb.auth.startAutoRefresh(); keepAlive(); setTimeout(fireResume, 1200); } else sb.auth.stopAutoRefresh();
+});
+setInterval(() => { if (appActive) keepAlive(); }, 15000);
 sb.auth.startAutoRefresh();
 async function resolveEmail(ident, p) {
   const id = ident.trim();

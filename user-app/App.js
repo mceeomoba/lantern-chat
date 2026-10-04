@@ -5,7 +5,7 @@ import * as DocumentPicker from 'expo-document-picker';
 import * as Location from 'expo-location';
 import { createAudioPlayer, setAudioModeAsync } from 'expo-audio';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { sb, friendly, signIn, signUp, listChats, listMessages, sendMessage, openDm, reportMessage, peerReadAt, markRead, listGames, startGame, gameMove, startCall, setCall, listCalls, listStatuses, postStatus, uploadMedia, sendMedia, sendKind, signedUrl, postStatusPhoto, contacts, myProfile, saveProfile, registerPush, unregisterPush, avatarUrl } from './src/api';
+import { sb, friendly, resumeBus, signIn, signUp, listChats, listMessages, sendMessage, openDm, reportMessage, peerReadAt, markRead, listGames, startGame, gameMove, startCall, setCall, listCalls, listStatuses, postStatus, uploadMedia, sendMedia, sendKind, signedUrl, postStatusPhoto, contacts, myProfile, saveProfile, registerPush, unregisterPush, avatarUrl } from './src/api';
 import messaging from '@react-native-firebase/messaging';
 import { runCall } from './src/call';
 import YouPage from './src/You';
@@ -227,8 +227,9 @@ function Thread({ chat, me, back, onCall }) {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'messages', filter: `chat_id=eq.${chat.id}` }, load)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'games', filter: `chat_id=eq.${chat.id}` }, load)
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'chat_members', filter: `chat_id=eq.${chat.id}` }, load)
-      .subscribe();
-    return () => { on = false; sb.removeChannel(ch); };
+      .subscribe((st) => { if (st === 'SUBSCRIBED') load(); });
+    resumeBus.add(load);
+    return () => { on = false; resumeBus.delete(load); sb.removeChannel(ch); };
   }, [chat.id]);
   useEffect(() => {
     const ch = sb.channel('pres' + chat.id, { config: { presence: { key: me } } });
@@ -311,8 +312,9 @@ export default function App() {
   const refresh = async () => me && setChats(await listChats(me));
   useEffect(() => {
     refresh(); if (!me) return;
-    const ch = sb.channel('list' + me).on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, refresh).on('postgres_changes', { event: '*', schema: 'public', table: 'chat_members' }, refresh).subscribe();
-    return () => { sb.removeChannel(ch); };
+    const ch = sb.channel('list' + me).on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, refresh).on('postgres_changes', { event: '*', schema: 'public', table: 'chat_members' }, refresh).subscribe((st) => { if (st === 'SUBSCRIBED') refresh(); });
+    resumeBus.add(refresh);
+    return () => { resumeBus.delete(refresh); sb.removeChannel(ch); };
   }, [me, cur]);
   const [live, setLive] = useState(null); const [incoming, setIncoming] = useState(null);
   const placeCall = async (x) => { try { const id = await startCall(x.chat_id || x.id); setLive({ id, caller: true, name: x.name }); } catch (e) { notify(e.message); } };
