@@ -19,7 +19,9 @@
     "react-native": "0.86.3",
     "react-native-safe-area-context": "~5.7.0",
     "react-native-web": "^0.21.2",
-    "react-native-webrtc": "^124.0.8"
+    "react-native-webrtc": "^124.0.8",
+    "@react-native-firebase/app": "26.4.0",
+    "@react-native-firebase/messaging": "26.4.0"
   },
   "scripts": {
     "start": "expo start",

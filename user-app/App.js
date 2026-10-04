@@ -1,11 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, TextInput, Pressable, FlatList, ScrollView, StyleSheet, Platform, StatusBar, Modal, Alert, Image, Linking, useWindowDimensions } from 'react-native';
+import { View, Text, TextInput, Pressable, FlatList, ScrollView, StyleSheet, Platform, StatusBar, Modal, Alert, Image, Linking, useWindowDimensions, PermissionsAndroid } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import * as Location from 'expo-location';
 import { AudioModule, RecordingPresets, createAudioPlayer, setAudioModeAsync, useAudioRecorder } from 'expo-audio';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { sb, signIn, signUp, listChats, listMessages, sendMessage, openDm, reportMessage, peerReadAt, markRead, listGames, startGame, gameMove, startCall, setCall, listCalls, listStatuses, postStatus, uploadMedia, sendMedia, sendKind, signedUrl, postStatusPhoto, contacts, myProfile, saveProfile } from './src/api';
+import { sb, signIn, signUp, listChats, listMessages, sendMessage, openDm, reportMessage, peerReadAt, markRead, listGames, startGame, gameMove, startCall, setCall, listCalls, listStatuses, postStatus, uploadMedia, sendMedia, sendKind, signedUrl, postStatusPhoto, contacts, myProfile, saveProfile, registerPush, unregisterPush } from './src/api';
+import messaging from '@react-native-firebase/messaging';
 import { runCall } from './src/call';
 const notify = (m) => (Platform.OS === 'web' ? window.alert(m) : Alert.alert('Lantern', m));
 
@@ -291,6 +292,18 @@ export default function App() {
   const [session, setSession] = useState(null);   const [tab, setTab] = useState('chats'); const [chats, setChats] = useState([]); const [cur, setCur] = useState(null);
   useEffect(() => { sb.auth.getSession().then(({ data }) => setSession(data.session)); const { data } = sb.auth.onAuthStateChange((_e, ss) => setSession(ss)); return () => data.subscription.unsubscribe(); }, []);
   const me = session?.user?.id;
+  useEffect(() => {
+    if (!me) return; let off = () => {};
+    (async () => {
+      try {
+        if (Platform.OS !== 'android') return;
+        if (Platform.Version >= 33) { const r = await PermissionsAndroid.request('android.permission.POST_NOTIFICATIONS'); if (r !== 'granted') return; }
+        const m = messaging(); const t = await m.getToken(); if (t) await registerPush(t);
+        off = m.onTokenRefresh((nt) => registerPush(nt));
+      } catch (e) {}
+    })();
+    return () => off();
+  }, [me]);
   const refresh = async () => me && setChats(await listChats(me));
   useEffect(() => {
     refresh(); if (!me) return;
@@ -317,7 +330,7 @@ export default function App() {
           {tab === 'updates' && <Updates me={me} />}
           {tab === 'calls' && <Calls me={me} call={placeCall} />}
           {tab === 'chats' && <Chats chats={list} open={setCur} newChat={newChat} onCamera={postPhotoStatus} />}
-          {tab === 'you' && <You name={name} me={me} onOut={() => sb.auth.signOut()} />}
+          {tab === 'you' && <You name={name} me={me} onOut={async () => { try { const t = await messaging().getToken(); await unregisterPush(t); } catch (e) {} sb.auth.signOut(); }} />}
           <View style={s.tabbar}>
             <Tab icon="aperture-outline" label="Updates" on={tab === 'updates'} press={() => setTab('updates')} />
             <Tab icon="call-outline" label="Calls" on={tab === 'calls'} press={() => setTab('calls')} />

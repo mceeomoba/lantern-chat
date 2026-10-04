@@ -102,3 +102,6 @@ export async function contacts(me) {
 
 export async function myProfile(me) { const { data } = await sb.from('profiles').select('username,display_name,bio').eq('id', me).maybeSingle(); return data || {}; }
 export const saveProfile = (me, display_name, bio) => sb.from('profiles').update({ display_name, bio }).eq('id', me);
+
+export const registerPush = (t) => sb.rpc('register_push_token', { t, a: 'chat' });
+export const unregisterPush = (t) => sb.rpc('unregister_push_token', { t });
