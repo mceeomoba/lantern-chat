@@ -31,7 +31,7 @@ export async function listChats(me) {
   return out.sort((a, b) => String(b.time).localeCompare(String(a.time)));
 }
 export async function listMessages(chat) {
-  const { data } = await sb.from('messages').select('id,sender_id,body,removed,created_at,kind,media_path,duration,reply_to').eq('chat_id', chat).order('created_at', { ascending: true }).limit(200);
+  const { data } = await sb.from('messages').select('id,sender_id,body,removed,created_at,kind,media_path,duration,reply_to,wave').eq('chat_id', chat).order('created_at', { ascending: true }).limit(200);
   return data || [];
 }
 export const sendMessage = (chat, me, body, replyTo) => sb.from('messages').insert({ chat_id: chat, sender_id: me, body, reply_to: replyTo || null });
@@ -83,7 +83,7 @@ export async function uploadMedia(me, uri, mime, ext, scope) {
   if (error) throw error;
   return path;
 }
-export const sendMedia = (chat, me, kind, path, body, duration) => sb.from('messages').insert({ chat_id: chat, sender_id: me, body, kind, media_path: path, duration });
+export const sendMedia = (chat, me, kind, path, body, duration, wave) => sb.from('messages').insert({ chat_id: chat, sender_id: me, body, kind, media_path: path, duration, wave: wave || null });
 export const sendKind = (chat, me, kind, body) => sb.from('messages').insert({ chat_id: chat, sender_id: me, body, kind });
 export async function signedUrl(path) { const { data } = await sb.storage.from('media').createSignedUrl(path, 3600); return data?.signedUrl; }
 export async function postStatusPhoto(me, path) { return sb.from('statuses').insert({ body: 'Photo', media_path: path }); }

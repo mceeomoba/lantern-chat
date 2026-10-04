@@ -1,14 +1,16 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, TextInput, Pressable, FlatList, ScrollView, StyleSheet, Platform, StatusBar, Modal, Alert, Image, Linking, useWindowDimensions, PermissionsAndroid } from 'react-native';
+import { View, Text, TextInput, Pressable, FlatList, ScrollView, StyleSheet, Platform, StatusBar, Modal, Alert, Image, Linking, useWindowDimensions, PermissionsAndroid, KeyboardAvoidingView } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import * as Location from 'expo-location';
-import { AudioModule, RecordingPresets, createAudioPlayer, setAudioModeAsync, useAudioRecorder } from 'expo-audio';
+import { createAudioPlayer, setAudioModeAsync } from 'expo-audio';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { sb, signIn, signUp, listChats, listMessages, sendMessage, openDm, reportMessage, peerReadAt, markRead, listGames, startGame, gameMove, startCall, setCall, listCalls, listStatuses, postStatus, uploadMedia, sendMedia, sendKind, signedUrl, postStatusPhoto, contacts, myProfile, saveProfile, registerPush, unregisterPush, avatarUrl } from './src/api';
 import messaging from '@react-native-firebase/messaging';
 import { runCall } from './src/call';
 import YouPage from './src/You';
+import Composer from './src/Composer';
+import StickerPanel from './src/StickerPanel';
 import { GlassBackdrop, Glass } from './src/glass';
 import { useSettings, loadSettings, resetSettings, getSettings, sizes, wallpapers } from './src/settings';
 const notify = (m) => (Platform.OS === 'web' ? window.alert(m) : Alert.alert('Lantern', m));
@@ -33,19 +35,27 @@ const StickerArt = ({ id, size = 110 }) => { const x = STICKERS.find((t) => t[0]
     <MaterialCommunityIcons name={x[1]} size={size * 0.55} color={x[2]} /><Text style={{ fontSize: size * 0.12, fontWeight: '700', color: x[2] }}>{x[3]}</Text></View>); };
 
 function useSigned(path) { const [u, setU] = useState(null); useEffect(() => { let on = true; if (path) signedUrl(path).then((x) => on && setU(x)); return () => { on = false; }; }, [path]); return u; }
-const MediaImg = ({ path, w = 220 }) => { const st = useSettings(); const [go, setGo] = useState(false); const u = useSigned(st.autoload || go ? path : null); if (!st.autoload && !go) return <Pressable onPress={() => setGo(true)} style={{ width: w, height: w * 0.75, borderRadius: 12, backgroundColor: '#ddd', alignItems: 'center', justifyContent: 'center' }}><Ionicons name="download-outline" size={30} color="#555" /><Text style={{ color: '#555' }}>Tap to load photo</Text></Pressable>; return u ? <Image source={{ uri: u }} style={{ width: w, height: w * 0.75, borderRadius: 12 }} resizeMode="cover" /> : <View style={{ width: w, height: w * 0.75, borderRadius: 12, backgroundColor: '#ddd' }} />; };
+const MediaImg = ({ path, w = 220, sq }) => { const st = useSettings(); const [go, setGo] = useState(false); const u = useSigned(st.autoload || go ? path : null); if (!st.autoload && !go) return <Pressable onPress={() => setGo(true)} style={{ width: w, height: w * 0.75, borderRadius: 12, backgroundColor: '#ddd', alignItems: 'center', justifyContent: 'center' }}><Ionicons name="download-outline" size={30} color="#555" /><Text style={{ color: '#555' }}>Tap to load photo</Text></Pressable>; return u ? <Image source={{ uri: u }} style={{ width: w, height: sq ? w : w * 0.75, borderRadius: 12 }} resizeMode="cover" /> : <View style={{ width: w, height: w * 0.75, borderRadius: 12, backgroundColor: '#ddd' }} />; };
 function VoiceBubble({ m }) {
-  const [on, setOn] = useState(false); const pl = useRef();
-  const toggle = async () => { if (on) { pl.current?.pause(); setOn(false); return; } const u = await signedUrl(m.media_path); if (!u) return; try { await setAudioModeAsync({ playsInSilentMode: true }); } catch (e) {} pl.current?.remove?.(); pl.current = createAudioPlayer({ uri: u }); pl.current.addListener('playbackStatusUpdate', (st) => { if (st.didJustFinish) setOn(false); }); pl.current.play(); setOn(true); };
+  const [on, setOn] = useState(false); const [pos, setPos] = useState(0); const pl = useRef(); const d = m.duration || 1;
+  const toggle = async () => { if (on) { pl.current?.pause(); setOn(false); return; } if (pl.current) { pl.current.play(); setOn(true); return; } const u = await signedUrl(m.media_path); if (!u) return; try { await setAudioModeAsync({ playsInSilentMode: true }); } catch (e) {} pl.current = createAudioPlayer({ uri: u }); pl.current.addListener('playbackStatusUpdate', (x) => { if (x.didJustFinish) { setOn(false); setPos(0); pl.current?.seekTo?.(0); } else if (x.currentTime != null) setPos(x.currentTime); }); pl.current.play(); setOn(true); };
   useEffect(() => () => pl.current?.remove?.(), []);
-  const d = m.duration || 0;
-  return (<Pressable onPress={toggle} style={{ flexDirection: 'row', alignItems: 'center', width: 210 }}><Ionicons name={on ? 'pause' : 'play'} size={30} color="#555" /><View style={{ flex: 1, height: 4, backgroundColor: '#B0B6BB', borderRadius: 2, marginHorizontal: 8 }} /><Text style={{ fontSize: 12, color: '#667781' }}>{Math.floor(d / 60)}:{String(d % 60).padStart(2, '0')}</Text></Pressable>);
+  const bars = (m.wave && m.wave.length >= 8 ? m.wave : '2'.repeat(40)).split('').map(Number); const prog = Math.min(1, pos / d);
+  const left = on || pos > 0 ? Math.max(0, d - Math.floor(pos)) : d;
+  return (
+    <View style={{ width: 230 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+        <Pressable onPress={toggle}><Ionicons name={on ? 'pause' : 'play'} size={32} color="#555" /></Pressable>
+        <View style={{ flex: 1, height: 30, marginLeft: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>{bars.map((v, i) => <View key={i} style={{ width: 3, borderRadius: 2, height: 4 + v * 2.8, backgroundColor: i / bars.length < prog ? '#1B1B1B' : '#9AA0A6' }} />)}</View>
+      </View>
+      <Text style={{ fontSize: 12, color: '#667781', marginLeft: 40 }}>{Math.floor(left / 60)}:{String(left % 60).padStart(2, '0')}</Text>
+    </View>);
 }
 function MsgBody({ m }) {
   const st = useSettings();
   if (m.kind === 'image') return <MediaImg path={m.media_path} />;
   if (m.kind === 'voice') return <VoiceBubble m={m} />;
-  if (m.kind === 'sticker') return <StickerArt id={m.body} />;
+  if (m.kind === 'sticker') return m.media_path ? <MediaImg path={m.media_path} w={150} sq /> : <StickerArt id={m.body} />;
   if (m.kind === 'location') return (<Pressable onPress={() => Linking.openURL('https://www.google.com/maps?q=' + m.body)} style={{ flexDirection: 'row', alignItems: 'center' }}><Ionicons name="location" size={26} color="#34C38F" /><Text style={{ marginLeft: 6, fontSize: 16 }}>Shared location{'\n'}<Text style={{ color: '#0A7CFF', fontSize: 13 }}>Open in maps</Text></Text></Pressable>);
   if (m.kind === 'document') return (<Pressable onPress={async () => Linking.openURL(await signedUrl(m.media_path))} style={{ flexDirection: 'row', alignItems: 'center' }}><Ionicons name="document" size={26} color="#2196F3" /><Text style={{ marginLeft: 6, fontSize: 16, maxWidth: 180 }} numberOfLines={2}>{m.body}</Text></Pressable>);
   return <Text style={{ fontSize: sizes[st.textsize] + 1 }}>{m.body}</Text>;
@@ -208,7 +218,7 @@ function CallScreen({ c, me, end }) {
 
 function Thread({ chat, me, back, onCall }) {
   const st = useSettings(); const [info, setInfo] = useState(false);
-  const [msgs, setMsgs] = useState([]); const [peerRead, setPeerRead] = useState(null); const [t, setT] = useState(''); const ref = useRef(); const [games, setGames] = useState([]); const [sheet, setSheet] = useState(false); const [stk, setStk] = useState(false); const [recing, setRecing] = useState(false); const rec = useAudioRecorder(RecordingPresets.HIGH_QUALITY); const t0 = useRef(0); const [replyTo, setReplyTo] = useState(null); const [online, setOnline] = useState(false); const [typing, setTyping] = useState(false); const presCh = useRef(); const tyT = useRef();
+  const [msgs, setMsgs] = useState([]); const [peerRead, setPeerRead] = useState(null); const [t, setT] = useState(''); const ref = useRef(); const [games, setGames] = useState([]); const [sheet, setSheet] = useState(false); const [stk, setStk] = useState(false); const [replyTo, setReplyTo] = useState(null); const [online, setOnline] = useState(false); const [typing, setTyping] = useState(false); const presCh = useRef(); const tyT = useRef();
   useEffect(() => {
     let on = true;
     const load = async () => { if (!on) return; setMsgs(await listMessages(chat.id)); setPeerRead(await peerReadAt(chat.id, me)); setGames(await listGames(chat.id)); markRead(chat.id, me); };
@@ -242,17 +252,16 @@ function Thread({ chat, me, back, onCall }) {
     const ext = (a.name.split('.').pop() || 'bin').slice(0, 8); const path = await uploadMedia(me, a.uri, a.mimeType || 'application/octet-stream', ext, chat.id); const { error } = await sendMedia(chat.id, me, 'document', path, a.name); if (error) throw error; } catch (e) { fail(e); } };
   const sendLoc = async () => { setSheet(false); try { const p = await Location.requestForegroundPermissionsAsync(); if (!p.granted) return notify('Location permission is needed'); const pos = await Location.getCurrentPositionAsync({}); const { error } = await sendKind(chat.id, me, 'location', `${pos.coords.latitude.toFixed(5)},${pos.coords.longitude.toFixed(5)}`); if (error) throw error; } catch (e) { fail(e); } };
   const sendSticker = async (id) => { setStk(false); const { error } = await sendKind(chat.id, me, 'sticker', id); if (error) fail(error); };
-  const micTap = async () => { try {
-    if (!recing) { const p = await AudioModule.requestRecordingPermissionsAsync(); if (!p.granted) return notify('Microphone permission is needed'); await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true }); await rec.prepareToRecordAsync(); rec.record(); t0.current = Date.now(); setRecing(true); }
-    else { setRecing(false); await rec.stop(); const uri = rec.uri; const d = Math.max(1, Math.round((Date.now() - t0.current) / 1000)); if (!uri) return; const path = await uploadMedia(me, uri, 'audio/mp4', 'm4a', chat.id); const { error } = await sendMedia(chat.id, me, 'voice', path, 'Voice message', d); if (error) throw error; }
-  } catch (e) { setRecing(false); fail(e); } };
+  const sendVoice = async (uri, d, wave) => { try { const path = await uploadMedia(me, uri, 'audio/mp4', 'm4a', chat.id); const { error } = await sendMedia(chat.id, me, 'voice', path, 'Voice message', d, wave); if (error) throw error; } catch (e) { fail(e); } };
+  const createSticker = async () => { setStk(false); try { const r = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.7, allowsEditing: true, aspect: [1, 1] }); if (r.canceled) return; const a = r.assets[0]; const path = await uploadMedia(me, a.uri, a.mimeType || 'image/jpeg', (a.mimeType || 'image/jpeg').split('/')[1] || 'jpg', chat.id); const { error } = await sendMedia(chat.id, me, 'sticker', path, 'custom'); if (error) throw error; } catch (e) { fail(e); } };
+  const sendCustom = async (path) => { setStk(false); const { error } = await sendMedia(chat.id, me, 'sticker', path, 'custom'); if (error) fail(error); };
   const newGame = async () => { setSheet(false); try { await startGame(chat.id); setGames(await listGames(chat.id)); } catch (e) { notify(e.message); } };
   const move = async (id, i) => { try { await gameMove(id, i); } catch (e) { notify(e.message); } };
   const gitems = games.map((g) => ({ id: 'g' + g.id, game: g, time: new Date(g.created_at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }), ts: g.created_at }));
   const items0 = msgs.map((m) => ({ id: m.id, mine: m.sender_id === me, body: m.removed ? 'This message was removed' : m.body, raw: m.removed ? { body: 'This message was removed', kind: 'text' } : m, time: new Date(m.created_at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }), ticks: m.sender_id === me, read: peerRead && new Date(peerRead) >= new Date(m.created_at), ts: m.created_at, orig: m }));
   const items = [...items0, ...gitems].sort((a, b) => String(a.ts).localeCompare(String(b.ts)));
   return (
-    <View style={[s.screen, { backgroundColor: st.wallpaper === 'glass' ? 'transparent' : wallpapers[st.wallpaper] }]}>
+    <KeyboardAvoidingView behavior="padding" style={[s.screen, { backgroundColor: st.wallpaper === 'glass' ? 'transparent' : wallpapers[st.wallpaper] }]}>
       <View style={[s.topBar, { backgroundColor: 'transparent' }]}>
         <Pressable onPress={back} style={[s.round, { width: 66, flexDirection: 'row' }]}><Ionicons name="chevron-back" size={24} color="#111" /></Pressable>
         <Pressable onPress={() => chat.other && setInfo(true)} style={{ flexDirection: 'row', alignItems: 'center', flex: 1, marginLeft: 8 }}><Avatar size={36} color="#D7B9A5" uri={avatarUrl(chat.avatar)} /><View style={{ marginLeft: 8, flex: 1 }}><Text style={{ fontSize: 17, fontWeight: '600' }} numberOfLines={1}>{chat.name}</Text>{(typing || online) ? <Text style={{ fontSize: 12, color: GD }}>{typing ? 'typing...' : 'online'}</Text> : null}</View></Pressable>
@@ -262,7 +271,7 @@ function Thread({ chat, me, back, onCall }) {
       <FlatList ref={ref} data={items} keyExtractor={(m) => String(m.id)} contentContainerStyle={{ padding: 10 }} onContentSizeChange={() => ref.current?.scrollToEnd?.({ animated: false })}
         renderItem={({ item: m }) => m.game ? <GameCard g={m.game} me={me} move={move} /> : (
           <Pressable onLongPress={() => { if (!m.orig) return; const btns = [{ text: 'Reply', onPress: () => setReplyTo({ id: m.orig.id, text: m.orig.kind && m.orig.kind !== 'text' ? ({ image: 'Photo', voice: 'Voice message', document: 'Document', location: 'Location', sticker: 'Sticker' })[m.orig.kind] : m.orig.body }) }]; if (!m.mine) btns.push({ text: 'Report', onPress: () => reportMessage(me, m.orig.id, 'Reported from chat').then(() => notify('Reported to admins')) }); btns.push({ text: 'Cancel', style: 'cancel' }); Alert.alert('Message', undefined, btns); }} style={[s.bubble, m.mine ? s.out : s.inn]}>
-                        {m.orig?.reply_to ? (<View style={s.quote}><Text style={{ fontSize: 13, color: '#444' }} numberOfLines={2}>{(() => { const q = msgs.find((x) => x.id === m.orig.reply_to); return q ? (q.removed ? 'This message was removed' : q.kind && q.kind !== 'text' ? ({ image: 'Photo', voice: 'Voice message', document: 'Document', location: 'Location', sticker: 'Sticker' })[q.kind] : q.body) : 'Original message'; })()}</Text></View>) : null}
+                        {m.orig?.reply_to ? (<View style={s.quote}><Text style={{ fontSize: 13, color: '#444' }} numberOfLines={2}>{(() => { const q = msgs.find((x) => x.id === m.orig.reply_to); return q ? (q.removed ? 'This message was removed' : q.kind && q.kind !== 'text' ? (q.kind === 'voice' ? 'Voice message (' + Math.floor((q.duration || 0) / 60) + ':' + String((q.duration || 0) % 60).padStart(2, '0') + ')' : ({ image: 'Photo', voice: 'Voice message', document: 'Document', location: 'Location', sticker: 'Sticker' })[q.kind]) : q.body) : 'Original message'; })()}</Text></View>) : null}
             <MsgBody m={m.raw || { body: m.body }} />
             <View style={{ flexDirection: 'row', alignSelf: 'flex-end', alignItems: 'center' }}><Text style={s.tm}>{m.time}</Text>{m.ticks && <Ionicons name={m.read ? 'checkmark-done' : 'checkmark'} size={15} color={m.read ? '#34B7F1' : '#8696A0'} style={{ marginLeft: 3 }} />}</View>
           </Pressable>)} />
@@ -270,18 +279,9 @@ function Thread({ chat, me, back, onCall }) {
         {[['Photos', 'images', '#1E88E5', () => sendPhoto(false)], ['Camera', 'camera', '#455A64', () => sendPhoto(true)], ['Location', 'location', '#26A69A', sendLoc], ['Document', 'document', '#2196F3', sendDoc], ['Games', 'game-controller', '#7B4DFF', newGame]].map(([l, ic, col, fn]) => (
           <Pressable key={l} onPress={fn} style={{ alignItems: 'center', width: '25%', marginVertical: 10 }}><View style={s.sheetIc}><Ionicons name={ic} size={28} color={col} /></View><Text style={{ marginTop: 6, fontSize: 13 }}>{l === 'Games' ? 'Tic-Tac-Toe' : l}</Text></Pressable>))}
       </View></Pressable></Modal>
-      <Modal transparent visible={stk} animationType="slide" onRequestClose={() => setStk(false)}><Pressable style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: '#0003' }} onPress={() => setStk(false)}><View style={{ backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 14, flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center' }}>
-        {STICKERS.map((x) => (<Pressable key={x[0]} onPress={() => sendSticker(x[0])} style={{ margin: 6 }}><StickerArt id={x[0]} size={78} /></Pressable>))}
-      </View></Pressable></Modal>
-      {replyTo ? (<View style={[s.quote, { marginHorizontal: 8, flexDirection: 'row', alignItems: 'center' }]}><Text style={{ flex: 1, color: '#444' }} numberOfLines={1}>Replying to: {replyTo.text}</Text><Pressable onPress={() => setReplyTo(null)}><Ionicons name="close" size={20} color="#444" /></Pressable></View>) : null}
-      <View style={{ flexDirection: 'row', alignItems: 'center', padding: 8 }}>
-        <Pressable onPress={() => setSheet(true)} style={{ paddingHorizontal: 6 }}><Ionicons name="add" size={32} color="#111" /></Pressable>
-        <View style={s.input}><TextInput style={{ flex: 1, fontSize: 17 }} value={recing ? 'Recording... tap the mic to send' : t} editable={!recing} onChangeText={onType} placeholder="Message" onSubmitEditing={send} /><Pressable onPress={() => setStk(true)}><MaterialCommunityIcons name="sticker-emoji" size={24} color="#666" /></Pressable></View>
-        {!t.trim() && !recing && <Pressable onPress={() => sendPhoto(true)} style={{ paddingHorizontal: 8 }}><Ionicons name="camera-outline" size={28} color="#111" /></Pressable>}
-        {t.trim() ? <Pressable onPress={send} style={[s.round, { backgroundColor: G, width: 40, height: 40 }]}><Ionicons name="send" size={20} color="#fff" /></Pressable>
-          : <Pressable onPress={micTap} style={[s.round, { backgroundColor: recing ? '#E0143C' : G, width: 40, height: 40 }]}><Ionicons name={recing ? 'stop' : 'mic'} size={22} color="#fff" /></Pressable>}
-      </View>
-    </View>
+      <Composer t={t} onType={onType} send={send} onPlus={() => setSheet(true)} onCamera={() => sendPhoto(true)} onSticker={() => setStk(!stk)} stkOpen={stk} onVoice={sendVoice} onFocus={() => setStk(false)} replyBar={replyTo ? (<View style={[s.quote, { marginHorizontal: 8, flexDirection: 'row', alignItems: 'center' }]}><Text style={{ flex: 1, color: '#444' }} numberOfLines={1}>Replying to: {replyTo.text}</Text><Pressable onPress={() => setReplyTo(null)}><Ionicons name="close" size={20} color="#444" /></Pressable></View>) : null} />
+      {stk ? <StickerPanel me={me} STICKERS={STICKERS} StickerArt={StickerArt} onPick={sendSticker} onPickCustom={sendCustom} onCreate={createSticker} /> : null}
+    </KeyboardAvoidingView>
   );
 }
 
