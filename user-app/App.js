@@ -62,7 +62,7 @@ function Auth() {
       {!!err && <Text style={{ color: '#c00', marginBottom: 8 }}>{err}</Text>}
       <Pressable style={s.btn} disabled={busy} onPress={() => (up ? setUp(false) : go(false))}><Text style={s.btnT}>Log in</Text></Pressable>
       <Pressable style={[s.btn, { backgroundColor: '#fff', borderWidth: 1, borderColor: G }]} disabled={busy} onPress={() => (up ? go(true) : setUp(true))}><Text style={[s.btnT, { color: GD }]}>Create account</Text></Pressable>
-            <Text style={{ color: '#888', fontSize: 12, marginTop: 24, textAlign: 'center' }}>Messages are not end-to-end encrypted. Admins can view reported content and moderate. No password recovery in this preview, keep your password safe.</Text>
+            <Text style={{ color: '#888', fontSize: 12, marginTop: 24, textAlign: 'center' }}>Messages are not end-to-end encrypted. Admins can view reported content and moderate. There is no password recovery yet, so keep your password safe.</Text>
     </View>
   );
 }
