@@ -20,14 +20,37 @@
       "permissions": [
         "RECORD_AUDIO",
         "MODIFY_AUDIO_SETTINGS",
-        "INTERNET"
+        "INTERNET",
+        "CAMERA",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION"
       ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "@config-plugins/react-native-webrtc"
+      "@config-plugins/react-native-webrtc",
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "Lantern uses the microphone for voice notes and calls."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Lantern lets you pick photos to send.",
+          "cameraPermission": "Lantern uses the camera to take photos to send."
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Lantern shares your location when you choose to send it."
+        }
+      ],
+      "expo-document-picker"
     ]
   }
 }
